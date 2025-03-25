@@ -405,6 +405,57 @@ describe("IDRPController", function () {
       expect(await idrp.balanceOf(user.address)).to.equal(amount);
     });
 
+    it("Should execute mint operation with amount 200M", async function () {
+      const amount = hre.ethers.parseUnits("200000000", 6); // 200M tokens
+      const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+
+      const operation = {
+        to: user.address,
+        operationType: OperationType.Mint,
+        amount: amount,
+        nonce: await controller.nonce(),
+        deadline: deadline,
+      };
+
+      const officerSignature = await officer.signTypedData(
+        domain,
+        types,
+        operation
+      );
+
+      const managerSignature = await manager.signTypedData(
+        domain,
+        types,
+        operation
+      );
+
+      await controller.executeOperation(
+        operation.operationType,
+        operation.to,
+        operation.amount,
+        operation.deadline,
+        [officerSignature, managerSignature]
+      );
+
+      expect(await idrp.balanceOf(user.address)).to.equal(amount);
+
+      // should fail if only officer signs
+      let failedAsExpected = false;
+      try {
+        await controller.executeOperation(
+          operation.operationType,
+          operation.to,
+          operation.amount,
+          operation.deadline,
+          [officerSignature]
+        );
+      } catch (error) {
+        failedAsExpected = true;
+      }
+
+      expect(failedAsExpected).to.be.true;
+    });
+
     it("Should execute burn operation", async function () {
       // First mint some tokens to the user
       const mintAmount = hre.ethers.parseUnits("50000000", 6);
