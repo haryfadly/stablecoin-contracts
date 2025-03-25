@@ -37,21 +37,18 @@ contract IDRP is
         _disableInitializers();
     }
 
-    function initialize(
-        string memory name,
-        string memory symbol
-    ) public initializer {
-        __ERC20_init(name, symbol);
+    function initialize(address superAdmin) public initializer {
+        __ERC20_init("IDRP", "IDRP");
         __ERC20Pausable_init();
         __AccessControl_init();
-        __ERC20Permit_init(name);
+        __ERC20Permit_init("IDRP");
         __UUPSUpgradeable_init();
 
-        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _grantRole(PAUSER_ROLE, _msgSender());
-        _grantRole(MINTER_ROLE, _msgSender());
-        _grantRole(FREEZER_ROLE, _msgSender());
-        _grantRole(UPGRADER_ROLE, _msgSender());
+        _grantRole(DEFAULT_ADMIN_ROLE, superAdmin);
+        _grantRole(PAUSER_ROLE, superAdmin);
+        _grantRole(MINTER_ROLE, superAdmin);
+        _grantRole(FREEZER_ROLE, superAdmin);
+        _grantRole(UPGRADER_ROLE, superAdmin);
     }
 
     function decimals() public pure override returns (uint8) {
@@ -85,6 +82,14 @@ contract IDRP is
         uint256 amount
     ) public onlyRole(MINTER_ROLE) whenNotPaused {
         if (frozen[from]) revert FrozenAccount();
+
+        // Ensure the MINTER_ROLE has an allowance from 'from'
+        uint256 currentAllowance = allowance(from, _msgSender());
+        require(currentAllowance >= amount, "Burn amount exceeds allowance");
+
+        // Deduct the burned amount from the allowance
+        _approve(from, _msgSender(), currentAllowance - amount);
+
         _burn(from, amount);
     }
 
