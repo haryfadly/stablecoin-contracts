@@ -73,7 +73,10 @@ describe("IDRPController", function () {
     const IDRPControllerFactory = await hre.ethers.getContractFactory(
       "IDRPController"
     );
-    controller = await IDRPControllerFactory.deploy(await idrp.getAddress());
+    controller = await IDRPControllerFactory.deploy(
+      await idrp.getAddress(),
+      await admin.getAddress()
+    );
 
     // Update the domain with the controller's address
     domain.verifyingContract = await controller.getAddress();
@@ -113,7 +116,7 @@ describe("IDRPController", function () {
       },
       {
         minAmount: ONE_BILLION,
-        maxAmount: hre.ethers.MaxUint256,
+        maxAmount: TEN_BILLION,
         requiredRoles: [
           OFFICER_ROLE,
           MANAGER_ROLE,
@@ -140,7 +143,7 @@ describe("IDRPController", function () {
       },
       {
         minAmount: ONE_BILLION,
-        maxAmount: hre.ethers.MaxUint256,
+        maxAmount: TEN_BILLION,
         requiredRoles: [
           OFFICER_ROLE,
           MANAGER_ROLE,

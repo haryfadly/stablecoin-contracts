@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 // Interface for IDRP-specific functions
 interface IIDRP {
@@ -13,7 +14,7 @@ interface IIDRP {
     function unfreeze(address account) external;
 }
 
-contract IDRPController is AccessControl {
+contract IDRPController is AccessControl, Ownable {
     using SafeERC20 for IERC20;
     
     // Role definitions
@@ -60,12 +61,12 @@ contract IDRPController is AccessControl {
     event QuorumRulesUpdated(OperationType indexed operationType);
     event TokensWithdrawn(address indexed token, address indexed to, uint256 amount);
     
-    constructor(address _idrpToken) {
+    constructor(address _idrpToken, address _safeAddress) Ownable(_safeAddress) {
         idrpToken = _idrpToken;
         
-        // Setup roles - typically would be set up with initial admin
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(ADMIN_ROLE, msg.sender);
+        // Setup roles - set Safe address as the admin
+        _grantRole(DEFAULT_ADMIN_ROLE, _safeAddress);
+        _grantRole(ADMIN_ROLE, _safeAddress);
         
         // Initialize domain separator for EIP-712
         DOMAIN_SEPARATOR = keccak256(
@@ -129,7 +130,7 @@ contract IDRPController is AccessControl {
     }
     
     // Function to withdraw other tokens that might be sent to this contract
-    function withdrawToken(address token, address to, uint256 amount) external onlyRole(ADMIN_ROLE) {
+    function withdrawToken(address token, address to, uint256 amount) external onlyOwner {
         // Don't allow withdrawing the IDRP token itself through this method
         require(token != idrpToken, "Cannot withdraw IDRP token");
         
