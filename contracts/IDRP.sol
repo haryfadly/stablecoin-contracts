@@ -145,4 +145,14 @@ contract IDRP is
     ) internal override(ERC20Upgradeable, ERC20PausableUpgradeable) {
         super._update(from, to, value);
     }
+
+    // Function to withdraw other tokens that might be sent to this contract
+    function withdrawToken(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(token != address(this), "Cannot withdraw IDRP token");
+        ERC20Upgradeable(token).transfer(to, amount);
+    }
 }

@@ -9,24 +9,27 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 // Interface for IDRP-specific functions
 interface IIDRP {
     function mint(address to, uint256 amount) external;
+
     function burn(address from, uint256 amount) external;
+
     function freeze(address account) external;
+
     function unfreeze(address account) external;
 }
 
 contract IDRPController is AccessControl, Ownable {
     using SafeERC20 for IERC20;
-    
+
     // Role definitions
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant OFFICER_ROLE = keccak256("OFFICER_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     bytes32 public constant DIRECTOR_ROLE = keccak256("DIRECTOR_ROLE");
     bytes32 public constant COMMISSIONER_ROLE = keccak256("COMMISSIONER_ROLE");
-    
+
     address public idrpToken;
     uint256 public nonce;
-    
+
     // Operation types
     enum OperationType {
         Mint,
@@ -34,44 +37,59 @@ contract IDRPController is AccessControl, Ownable {
         Freeze,
         Unfreeze
     }
-    
+
     // Quorum rule structure
     struct QuorumRule {
         uint256 minAmount;
         uint256 maxAmount;
         bytes32[] requiredRoles;
     }
-    
+
     // Mapping of operation types to their quorum rules
     mapping(OperationType => QuorumRule[]) public quorumRules;
-    
+
     // Mapping to track used signatures
     mapping(bytes32 => bool) public usedSignatures;
-    
+
     // Domain separator for EIP-712
     bytes32 private DOMAIN_SEPARATOR;
-    
+
     // Typehash for operation approvals
-    bytes32 private constant OPERATION_TYPEHASH = keccak256(
-        "Operation(address to,uint8 operationType,uint256 amount,uint256 nonce,uint256 deadline)"
-    );
-    
+    bytes32 private constant OPERATION_TYPEHASH =
+        keccak256(
+            "Operation(address to,uint8 operationType,uint256 amount,uint256 nonce,uint256 deadline)"
+        );
+
     // Events
-    event OperationExecuted(OperationType indexed operationType, address indexed to, uint256 amount, uint256 indexed nonce);
+    event OperationExecuted(
+        OperationType indexed operationType,
+        address indexed to,
+        uint256 amount,
+        uint256 indexed nonce
+    );
     event QuorumRulesUpdated(OperationType indexed operationType);
-    event TokensWithdrawn(address indexed token, address indexed to, uint256 amount);
-    
-    constructor(address _idrpToken, address _safeAddress) Ownable(_safeAddress) {
+    event TokensWithdrawn(
+        address indexed token,
+        address indexed to,
+        uint256 amount
+    );
+
+    constructor(
+        address _idrpToken,
+        address _safeAddress
+    ) Ownable(_safeAddress) {
         idrpToken = _idrpToken;
-        
+
         // Setup roles - set Safe address as the admin
         _grantRole(DEFAULT_ADMIN_ROLE, _safeAddress);
         _grantRole(ADMIN_ROLE, _safeAddress);
-        
+
         // Initialize domain separator for EIP-712
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
                 keccak256(bytes("IDRPController")),
                 keccak256(bytes("1")),
                 block.chainid,
@@ -79,17 +97,20 @@ contract IDRPController is AccessControl, Ownable {
             )
         );
     }
-    
+
     // Set quorum rules for an operation type
-    function setQuorumRules(OperationType operationType, QuorumRule[] calldata rules) external onlyRole(ADMIN_ROLE) {
+    function setQuorumRules(
+        OperationType operationType,
+        QuorumRule[] calldata rules
+    ) external onlyRole(ADMIN_ROLE) {
         delete quorumRules[operationType];
         for (uint256 i = 0; i < rules.length; i++) {
             quorumRules[operationType].push(rules[i]);
         }
-        
+
         emit QuorumRulesUpdated(operationType);
     }
-    
+
     // Main execution function
     function executeOperation(
         OperationType operationType,
@@ -99,22 +120,28 @@ contract IDRPController is AccessControl, Ownable {
         bytes[] calldata signatures
     ) external {
         require(block.timestamp <= deadline, "Operation expired");
-        
+
         // Get the appropriate quorum rule for this operation and amount
         QuorumRule memory rule = getQuorumRule(operationType, amount);
-        
+
         // Hash the operation data
-        bytes32 operationHash = getOperationHash(to, uint8(operationType), amount, nonce, deadline);
-        
+        bytes32 operationHash = getOperationHash(
+            to,
+            uint8(operationType),
+            amount,
+            nonce,
+            deadline
+        );
+
         // Verify signatures match required roles
         verifySignatures(operationHash, rule.requiredRoles, signatures);
-        
+
         // Mark operation hash as used to prevent replay
         usedSignatures[operationHash] = true;
-        
+
         // Increment nonce to prevent replay of future transactions
         nonce++;
-        
+
         // Execute the operation
         if (operationType == OperationType.Mint) {
             IIDRP(idrpToken).mint(to, amount);
@@ -125,32 +152,39 @@ contract IDRPController is AccessControl, Ownable {
         } else if (operationType == OperationType.Unfreeze) {
             IIDRP(idrpToken).unfreeze(to);
         }
-        
+
         emit OperationExecuted(operationType, to, amount, nonce - 1);
     }
-    
+
     // Function to withdraw other tokens that might be sent to this contract
-    function withdrawToken(address token, address to, uint256 amount) external onlyOwner {
+    function withdrawToken(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
         // Don't allow withdrawing the IDRP token itself through this method
         require(token != idrpToken, "Cannot withdraw IDRP token");
-        
+
         IERC20(token).safeTransfer(to, amount);
         emit TokensWithdrawn(token, to, amount);
     }
-    
+
     // Helper function to get the appropriate quorum rule
-    function getQuorumRule(OperationType operationType, uint256 amount) public view returns (QuorumRule memory) {
+    function getQuorumRule(
+        OperationType operationType,
+        uint256 amount
+    ) public view returns (QuorumRule memory) {
         QuorumRule[] storage rules = quorumRules[operationType];
-        
+
         for (uint256 i = 0; i < rules.length; i++) {
             if (amount >= rules[i].minAmount && amount < rules[i].maxAmount) {
                 return rules[i];
             }
         }
-        
+
         revert("No matching quorum rule found");
     }
-    
+
     // Helper to get the EIP-712 hash for an operation
     function getOperationHash(
         address to,
@@ -169,10 +203,13 @@ contract IDRPController is AccessControl, Ownable {
                 deadline
             )
         );
-        
-        return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+
+        return
+            keccak256(
+                abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash)
+            );
     }
-    
+
     // Verify that all required signatures are present and valid
     function verifySignatures(
         bytes32 operationHash,
@@ -180,44 +217,53 @@ contract IDRPController is AccessControl, Ownable {
         bytes[] calldata signatures
     ) internal view {
         require(!usedSignatures[operationHash], "Signatures already used");
-        
+
         // For each required role, verify at least one signature from that role is present
         for (uint256 i = 0; i < requiredRoles.length; i++) {
             bool roleSignatureFound = false;
             bytes32 role = requiredRoles[i];
-            
+
             for (uint256 j = 0; j < signatures.length; j++) {
-                address recoveredSigner = recoverSigner(operationHash, signatures[j]);
+                address recoveredSigner = recoverSigner(
+                    operationHash,
+                    signatures[j]
+                );
                 if (hasRole(role, recoveredSigner)) {
                     roleSignatureFound = true;
                     break;
                 }
             }
-            
-            require(roleSignatureFound, string(abi.encodePacked("Missing signature for role: ", role)));
+
+            require(
+                roleSignatureFound,
+                string(abi.encodePacked("Missing signature for role: ", role))
+            );
         }
     }
-    
+
     // Helper to recover the signer of a signature
-    function recoverSigner(bytes32 hash, bytes calldata signature) internal pure returns (address) {
+    function recoverSigner(
+        bytes32 hash,
+        bytes calldata signature
+    ) internal pure returns (address) {
         require(signature.length == 65, "Invalid signature length");
-        
+
         bytes32 r;
         bytes32 s;
         uint8 v;
-        
+
         assembly {
             r := calldataload(signature.offset)
             s := calldataload(add(signature.offset, 32))
             v := byte(0, calldataload(add(signature.offset, 64)))
         }
-        
+
         if (v < 27) {
             v += 27;
         }
-        
+
         require(v == 27 || v == 28, "Invalid signature 'v' value");
-        
+
         return ecrecover(hash, v, r, s);
     }
 }
