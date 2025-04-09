@@ -590,6 +590,41 @@ describe("IDRPController", function () {
           .transfer(admin.address, hre.ethers.parseUnits("1000", 6))
       ).to.be.rejected;
     });
+
+    it("Should execute operation with more than required signatures", async function () {
+      const amount = hre.ethers.parseUnits("50000000", 6); // 50M tokens
+      const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+
+      const operation = {
+        to: user.address,
+        operationType: OperationType.Mint,
+        amount: amount,
+        nonce: await controller.nonce(),
+        deadline: deadline,
+      };
+
+      const officerSignature = await officer.signTypedData(
+        domain,
+        types,
+        operation
+      );
+
+      const managerSignature = await manager.signTypedData(
+        domain,
+        types,
+        operation
+      );
+
+      await controller.executeOperation(
+        operation.operationType,
+        operation.to,
+        operation.amount,
+        operation.deadline,
+        [officerSignature, managerSignature]
+      );
+
+      expect(await idrp.balanceOf(user.address)).to.equal(amount);
+    });
   });
 
   describe("Withdrawal", function () {
