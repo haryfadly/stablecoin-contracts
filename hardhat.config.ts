@@ -4,7 +4,8 @@ import "@nomicfoundation/hardhat-toolbox"
 import "@openzeppelin/hardhat-upgrades"
 import "hardhat-dependency-compiler"
 
-const PRIVATE_KEY = vars.get("PRIVATE_KEY")
+// const PRIVATE_KEY = vars.get("PRIVATE_KEY")
+const IDRP_DEPLOYER_PRIVATE_KEY = vars.get("IDRP_DEPLOYER_PRIVATE_KEY")
 const ETHERSCAN_API_KEY = vars.get("ETHERSCAN_API_KEY")
 const ALCHEMY_API_KEY = vars.get("ALCHEMY_API_KEY")
 const POLYGON_API_KEY = vars.get("POLYGON_API_KEY")
@@ -18,12 +19,12 @@ const config: HardhatUserConfig = {
     holesky: {
       chainId: 17000,
       url: "https://ethereum-holesky.publicnode.com",
-      accounts: [PRIVATE_KEY],
+      accounts: [IDRP_DEPLOYER_PRIVATE_KEY],
     },
     polygon: {
       chainId: 137,
       url: `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-      accounts: [PRIVATE_KEY],
+      accounts: [IDRP_DEPLOYER_PRIVATE_KEY],
     },
   },
   etherscan: {
