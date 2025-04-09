@@ -25,6 +25,8 @@ contract IDRP is
     // Mapping to track frozen accounts
     mapping(address => bool) public frozen;
 
+    address public depositoryWallet;
+
     /// @dev Events
     event AccountFrozen(address indexed account);
     event AccountUnfrozen(address indexed account);
@@ -64,14 +66,10 @@ contract IDRP is
     }
 
     /// @notice Mint stablecoins to a specific address
-    /// @param to The address to receive the stablecoins
     /// @param amount The amount of stablecoins to mint
-    function mint(
-        address to,
-        uint256 amount
-    ) public onlyRole(MINTER_ROLE) whenNotPaused {
-        if (frozen[to]) revert FrozenAccount();
-        _mint(to, amount);
+    function mint(uint256 amount) public onlyRole(MINTER_ROLE) whenNotPaused {
+        if (frozen[depositoryWallet]) revert FrozenAccount();
+        _mint(depositoryWallet, amount);
     }
 
     /// @notice Burn stablecoins from a specific address
@@ -136,6 +134,15 @@ contract IDRP is
     function unfreeze(address account) external onlyRole(FREEZER_ROLE) {
         frozen[account] = false;
         emit AccountUnfrozen(account);
+    }
+
+    /// @notice Set the depository wallet address
+    /// @param wallet The address of the depository wallet
+    function setDepositoryWallet(
+        address wallet
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(wallet != address(0), "Invalid wallet address");
+        depositoryWallet = wallet;
     }
 
     function _update(
