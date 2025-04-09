@@ -1,7 +1,6 @@
 import fs from "fs"
 import path from "path"
 import hre from "hardhat"
-import { getAddress } from "ethers"
 
 async function main() {
   const name = "IDRPController"
