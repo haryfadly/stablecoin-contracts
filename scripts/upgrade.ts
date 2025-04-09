@@ -1,7 +1,24 @@
+import fs from "fs"
+import path from "path"
 import hre from "hardhat"
 
 async function main() {
-  const proxyAddress = "0x26f52c66229FfC86Aeb513370BF8bba6c81e07d0"
+  const networkId = hre.network.config.chainId ?? 8545
+  const deploymentDir = path.join(hre.config.paths.root || process.cwd(), "./deployment")
+
+  if (!fs.existsSync(deploymentDir)) {
+    fs.mkdirSync(deploymentDir, { recursive: true })
+  }
+
+  const deploymentFile = path.join(deploymentDir, `chain-${networkId}.json`)
+
+  // Fetch existing deployments
+  let deployments: Record<string, string> = {}
+  if (fs.existsSync(deploymentFile)) {
+    deployments = JSON.parse(fs.readFileSync(deploymentFile, "utf-8"))
+  }
+
+  const proxyAddress = deployments["IDRP"]
   const IDRP = await hre.ethers.getContractFactory("IDRP")
   const upgraded = await hre.upgrades.upgradeProxy(proxyAddress, IDRP)
 
