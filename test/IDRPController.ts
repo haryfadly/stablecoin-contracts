@@ -1,9 +1,8 @@
 import hre from "hardhat";
 import { expect } from "chai";
-import { IDRPController, IDRP } from "../typechain-types";
+import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 
 describe("IDRPController", function () {
-  // Define constants for test
   const OFFICER_ROLE = hre.ethers.keccak256(
     hre.ethers.toUtf8Bytes("OFFICER_ROLE")
   );
@@ -18,39 +17,10 @@ describe("IDRPController", function () {
   );
   const ADMIN_ROLE = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("ADMIN_ROLE"));
 
-  // For amount thresholds, in IDRP 6 decimals
   const ONE_HUNDRED_MILLION = hre.ethers.parseUnits("100000000", 6);
   const FIVE_HUNDRED_MILLION = hre.ethers.parseUnits("500000000", 6);
   const ONE_BILLION = hre.ethers.parseUnits("1000000000", 6);
   const TEN_BILLION = hre.ethers.parseUnits("10000000000", 6);
-
-  let idrp: IDRP;
-  let controller: IDRPController;
-  let admin: any;
-  let officer: any;
-  let manager: any;
-  let director: any;
-  let commissioner: any;
-  let user: any;
-
-  // Set up our EIP-712 domain
-  const domain = {
-    name: "IDRPController",
-    version: "1",
-    chainId: 31337, // hardhat's chainId
-    verifyingContract: "", // Will be set after deployment
-  };
-
-  // The type definition for our operation
-  const types = {
-    Operation: [
-      { name: "to", type: "address" },
-      { name: "operationType", type: "uint8" },
-      { name: "amount", type: "uint256" },
-      { name: "nonce", type: "uint256" },
-      { name: "deadline", type: "uint256" },
-    ],
-  };
 
   enum OperationType {
     Mint,
@@ -59,45 +29,50 @@ describe("IDRPController", function () {
     Unfreeze,
   }
 
-  beforeEach(async function () {
-    // Deploy the contracts
-    [admin, officer, manager, director, commissioner, user] =
+  async function deployFixture() {
+    const [admin, officer, manager, director, commissioner, user] =
       await hre.ethers.getSigners();
 
-    // Deploy IDRP token
     const IDRPFactory = await hre.ethers.getContractFactory("IDRP");
-    idrp = await hre.upgrades.deployProxy(IDRPFactory, [admin.address]);
+    const idrp = await hre.upgrades.deployProxy(IDRPFactory, [admin.address]);
     await idrp.waitForDeployment();
 
-    // Deploy the controller
     const IDRPControllerFactory = await hre.ethers.getContractFactory(
       "IDRPController"
     );
-    controller = await IDRPControllerFactory.deploy(
+    const controller = await IDRPControllerFactory.deploy(
       await idrp.getAddress(),
-      await admin.getAddress()
+      admin.address
     );
 
-    // Update the domain with the controller's address
-    domain.verifyingContract = await controller.getAddress();
+    // Domain for EIP-712
+    const domain = {
+      name: "IDRPController",
+      version: "1",
+      chainId: 31337,
+      verifyingContract: await controller.getAddress(),
+    };
 
-    // Set up roles for the signers
+    const types = {
+      Operation: [
+        { name: "to", type: "address" },
+        { name: "operationType", type: "uint8" },
+        { name: "amount", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" },
+      ],
+    };
+
+    // Set up roles
     await controller.grantRole(OFFICER_ROLE, officer.address);
     await controller.grantRole(MANAGER_ROLE, manager.address);
     await controller.grantRole(DIRECTOR_ROLE, director.address);
     await controller.grantRole(COMMISSIONER_ROLE, commissioner.address);
 
-    // Set up IDRP roles for the controller
-    await idrp.grantRole(
-      await idrp.MINTER_ROLE(),
-      await controller.getAddress()
-    );
-    await idrp.grantRole(
-      await idrp.FREEZER_ROLE(),
-      await controller.getAddress()
-    );
+    await idrp.grantRole(await idrp.MINTER_ROLE(), controller.getAddress());
+    await idrp.grantRole(await idrp.FREEZER_ROLE(), controller.getAddress());
 
-    // Set up quorum rules
+    // Set quorum rules
     await controller.setQuorumRules(OperationType.Mint, [
       {
         minAmount: 0,
@@ -125,6 +100,7 @@ describe("IDRPController", function () {
         ],
       },
     ]);
+
     await controller.setQuorumRules(OperationType.Burn, [
       {
         minAmount: 0,
@@ -152,6 +128,7 @@ describe("IDRPController", function () {
         ],
       },
     ]);
+
     await controller.setQuorumRules(OperationType.Freeze, [
       {
         minAmount: 0,
@@ -179,6 +156,7 @@ describe("IDRPController", function () {
         ],
       },
     ]);
+
     await controller.setQuorumRules(OperationType.Unfreeze, [
       {
         minAmount: 0,
@@ -206,10 +184,24 @@ describe("IDRPController", function () {
         ],
       },
     ]);
-  });
+
+    return {
+      idrp,
+      controller,
+      admin,
+      officer,
+      manager,
+      director,
+      commissioner,
+      user,
+      domain,
+      types,
+    };
+  }
 
   describe("Quorum Rules", function () {
     it("Should correctly set quorum rules for mint", async function () {
+      const { controller } = await loadFixture(deployFixture);
       const rule = await controller.getQuorumRule(OperationType.Mint, 0);
       expect(rule.minAmount).to.equal(0);
       expect(rule.maxAmount).to.equal(ONE_HUNDRED_MILLION);
@@ -218,6 +210,7 @@ describe("IDRPController", function () {
     });
 
     it("Should correctly set quorum rules for burn", async function () {
+      const { controller } = await loadFixture(deployFixture);
       const rule = await controller.getQuorumRule(OperationType.Burn, 0);
       expect(rule.minAmount).to.equal(0);
       expect(rule.maxAmount).to.equal(ONE_HUNDRED_MILLION);
@@ -226,6 +219,7 @@ describe("IDRPController", function () {
     });
 
     it("Should correctly set quorum rules for freeze", async function () {
+      const { controller } = await loadFixture(deployFixture);
       const rule = await controller.getQuorumRule(OperationType.Freeze, 0);
       expect(rule.minAmount).to.equal(0);
       expect(rule.maxAmount).to.equal(FIVE_HUNDRED_MILLION);
@@ -234,6 +228,7 @@ describe("IDRPController", function () {
     });
 
     it("Should correctly set quorum rules for unfreeze", async function () {
+      const { controller } = await loadFixture(deployFixture);
       const rule = await controller.getQuorumRule(OperationType.Unfreeze, 0);
       expect(rule.minAmount).to.equal(0);
       expect(rule.maxAmount).to.equal(FIVE_HUNDRED_MILLION);
@@ -244,6 +239,8 @@ describe("IDRPController", function () {
 
   describe("Signature Verification", function () {
     it("Should execute operation with proper signatures - small amount", async function () {
+      const { controller, idrp, officer, user, domain, types } =
+        await loadFixture(deployFixture);
       const amount = hre.ethers.parseUnits("50000000", 6); // 50M tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
@@ -277,6 +274,17 @@ describe("IDRPController", function () {
     });
 
     it("Should execute operation with proper signatures - large amount", async function () {
+      const {
+        controller,
+        idrp,
+        officer,
+        manager,
+        director,
+        commissioner,
+        user,
+        domain,
+        types,
+      } = await loadFixture(deployFixture);
       const amount = hre.ethers.parseUnits("1500000000", 6); // 1.5B tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
@@ -330,6 +338,8 @@ describe("IDRPController", function () {
     });
 
     it("Should fail if signatures are insufficient", async function () {
+      const { controller, idrp, officer, manager, user, domain, types } =
+        await loadFixture(deployFixture);
       const amount = hre.ethers.parseUnits("1500000000", 6); // 1.5B tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
@@ -376,6 +386,8 @@ describe("IDRPController", function () {
 
   describe("Token Operations", function () {
     it("Should execute mint operation", async function () {
+      const { controller, idrp, officer, user, domain, types } =
+        await loadFixture(deployFixture);
       const amount = hre.ethers.parseUnits("50000000", 6); // 50M tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
@@ -409,6 +421,8 @@ describe("IDRPController", function () {
     });
 
     it("Should execute mint operation with amount 200M", async function () {
+      const { controller, idrp, officer, manager, user, domain, types } =
+        await loadFixture(deployFixture);
       const amount = hre.ethers.parseUnits("200000000", 6); // 200M tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
@@ -460,6 +474,9 @@ describe("IDRPController", function () {
     });
 
     it("Should execute burn operation", async function () {
+      const { controller, idrp, officer, user, domain, types } =
+        await loadFixture(deployFixture);
+
       // First mint some tokens to the user
       const mintAmount = hre.ethers.parseUnits("50000000", 6);
 
@@ -531,6 +548,9 @@ describe("IDRPController", function () {
     });
 
     it("Should execute freeze operation", async function () {
+      const { controller, idrp, admin, officer, user, domain, types } =
+        await loadFixture(deployFixture);
+
       // First mint some tokens to the user so we can test freezing affects transfers
       const mintAmount = hre.ethers.parseUnits("50000000", 6);
 
@@ -592,6 +612,9 @@ describe("IDRPController", function () {
     });
 
     it("Should execute operation with more than required signatures", async function () {
+      const { controller, idrp, officer, manager, user, domain, types } =
+        await loadFixture(deployFixture);
+
       const amount = hre.ethers.parseUnits("50000000", 6); // 50M tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
@@ -629,6 +652,8 @@ describe("IDRPController", function () {
 
   describe("Withdrawal", function () {
     it("Should allow withdrawal of other tokens", async function () {
+      const { controller, idrp, admin } = await loadFixture(deployFixture);
+
       // Deploy a test ERC20 token
       const TestTokenFactory = await hre.ethers.getContractFactory("IDRP"); // Reusing IDRP for simplicity
       const testToken = await hre.upgrades.deployProxy(TestTokenFactory, [
@@ -671,6 +696,8 @@ describe("IDRPController", function () {
     });
 
     it("Should not allow withdrawal of IDRP token", async function () {
+      const { controller, idrp, admin } = await loadFixture(deployFixture);
+
       // Mint some IDRP tokens to the controller for testing
       await idrp
         .connect(admin)
