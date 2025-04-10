@@ -208,7 +208,7 @@ describe("IDRPController", function () {
 
   describe("Signature Verification", function () {
     it("Should execute operation with proper signatures - small amount", async function () {
-      const { controller, idrp, officer, user, domain, types } = await loadFixture(deployFixture)
+      const { controller, idrp, officer, depository, user, domain, types } = await loadFixture(deployFixture)
       const amount = hre.ethers.parseUnits("50000000", 6) // 50M tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
 
@@ -229,14 +229,16 @@ describe("IDRPController", function () {
         officerSignature,
       ])
 
+      // Transfer tokens from depository to user
+      await idrp.connect(depository).transfer(user.address, amount)
+
       // Verify IDRP balance
       expect(await idrp.balanceOf(user.address)).to.equal(amount)
     })
 
     it("Should execute operation with proper signatures - large amount", async function () {
-      const { controller, idrp, officer, manager, director, commissioner, user, domain, types } = await loadFixture(
-        deployFixture
-      )
+      const { controller, idrp, officer, manager, director, commissioner, depository, user, domain, types } =
+        await loadFixture(deployFixture)
       const amount = hre.ethers.parseUnits("1500000000", 6) // 1.5B tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
 
@@ -262,6 +264,9 @@ describe("IDRPController", function () {
         directorSignature,
         commissionerSignature,
       ])
+
+      // Transfer tokens from depository to user
+      await idrp.connect(depository).transfer(user.address, amount)
 
       // Verify IDRP balance
       expect(await idrp.balanceOf(user.address)).to.equal(amount)
@@ -304,7 +309,7 @@ describe("IDRPController", function () {
 
   describe("Token Operations", function () {
     it("Should execute mint operation", async function () {
-      const { controller, idrp, officer, user, domain, types } = await loadFixture(deployFixture)
+      const { controller, idrp, officer, depository, user, domain, types } = await loadFixture(deployFixture)
       const amount = hre.ethers.parseUnits("50000000", 6) // 50M tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
 
@@ -325,12 +330,15 @@ describe("IDRPController", function () {
         officerSignature,
       ])
 
+      // Transfer tokens from depository to user
+      await idrp.connect(depository).transfer(user.address, amount)
+
       // Verify IDRP balance
       expect(await idrp.balanceOf(user.address)).to.equal(amount)
     })
 
     it("Should execute mint operation with amount 200M", async function () {
-      const { controller, idrp, officer, manager, user, domain, types } = await loadFixture(deployFixture)
+      const { controller, idrp, officer, manager, depository, user, domain, types } = await loadFixture(deployFixture)
       const amount = hre.ethers.parseUnits("200000000", 6) // 200M tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
 
@@ -351,6 +359,9 @@ describe("IDRPController", function () {
         managerSignature,
       ])
 
+      // Transfer tokens from depository to user
+      await idrp.connect(depository).transfer(user.address, amount)
+
       expect(await idrp.balanceOf(user.address)).to.equal(amount)
 
       // should fail if only officer signs
@@ -367,7 +378,7 @@ describe("IDRPController", function () {
     })
 
     it("Should execute burn operation", async function () {
-      const { controller, idrp, officer, user, domain, types } = await loadFixture(deployFixture)
+      const { controller, idrp, officer, depository, user, domain, types } = await loadFixture(deployFixture)
 
       // First mint some tokens to the user
       const mintAmount = hre.ethers.parseUnits("50000000", 6)
@@ -392,6 +403,9 @@ describe("IDRPController", function () {
         mintOperation.deadline,
         [officerMintSignature]
       )
+
+      // Transfer tokens from depository to user
+      await idrp.connect(depository).transfer(user.address, mintAmount)
 
       // Verify minted balance
       expect(await idrp.balanceOf(user.address)).to.equal(mintAmount)
@@ -479,7 +493,7 @@ describe("IDRPController", function () {
     })
 
     it("Should execute operation with more than required signatures", async function () {
-      const { controller, idrp, officer, manager, user, domain, types } = await loadFixture(deployFixture)
+      const { controller, idrp, officer, manager, depository, user, domain, types } = await loadFixture(deployFixture)
 
       const amount = hre.ethers.parseUnits("50000000", 6) // 50M tokens
       const deadline = Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
@@ -501,6 +515,9 @@ describe("IDRPController", function () {
         managerSignature,
       ])
 
+      // Transfer tokens from depository to user
+      await idrp.connect(depository).transfer(user.address, amount)
+
       expect(await idrp.balanceOf(user.address)).to.equal(amount)
     })
   })
@@ -514,11 +531,14 @@ describe("IDRPController", function () {
       const testToken = await hre.upgrades.deployProxy(TestTokenFactory, [admin.address])
       await testToken.waitForDeployment()
 
-      // Mint some tokens to the admin
+      // Set depositoryWallet
+      await testToken.connect(admin).setDepositoryWallet(depository.address)
+
+      // Mint some tokens to the depository
       await testToken.connect(admin).mint(hre.ethers.parseUnits("1000", 6))
 
       // Transfer some tokens to the controller
-      const transferAmount = hre.ethers.parseUnits("100", 6)
+      const transferAmount = hre.ethers.parseUnits("1000", 6)
       await testToken.connect(depository).transfer(await controller.getAddress(), transferAmount)
 
       // Verify controller has the tokens
