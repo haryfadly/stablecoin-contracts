@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 // Interface for IDRP-specific functions
 interface IIDRP {
-    function mint(address to, uint256 amount) external;
+    function mint(uint256 amount) external;
 
     function burn(address from, uint256 amount) external;
 
@@ -144,7 +144,7 @@ contract IDRPController is AccessControl, Ownable {
 
         // Execute the operation
         if (operationType == OperationType.Mint) {
-            IIDRP(idrpToken).mint(to, amount);
+            IIDRP(idrpToken).mint(amount);
         } else if (operationType == OperationType.Burn) {
             IIDRP(idrpToken).burn(to, amount);
         } else if (operationType == OperationType.Freeze) {
