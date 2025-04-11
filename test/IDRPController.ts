@@ -30,8 +30,13 @@ describe("IDRPController", function () {
 
     // Set depositoryWallet
     await idrp.connect(admin).setDepositoryWallet(depository.address)
-    const IDRPControllerFactory = await hre.ethers.getContractFactory("IDRPController")
-    const controller = await IDRPControllerFactory.deploy(await idrp.getAddress(), admin.address)
+    //const IDRPControllerFactory = await hre.ethers.getContractFactory("IDRPController")
+    //const controller = await IDRPControllerFactory.deploy(await idrp.getAddress(), admin.address)
+    const controller = await hre.upgrades.deployProxy(await hre.ethers.getContractFactory("IDRPController"), [
+      await idrp.getAddress(),
+      admin.address,
+    ])
+    await controller.waitForDeployment()
 
     // Domain for EIP-712
     const domain = {

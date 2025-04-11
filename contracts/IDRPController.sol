@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 // Interface for IDRP-specific functions
 interface IIDRP {
@@ -17,7 +22,12 @@ interface IIDRP {
     function unfreeze(address account) external;
 }
 
-contract IDRPController is AccessControl, Ownable {
+contract IDRPController is 
+    Initializable,
+    AccessControlUpgradeable,
+    OwnableUpgradeable,
+    UUPSUpgradeable 
+{
     using SafeERC20 for IERC20;
 
     // Role definitions
@@ -74,10 +84,19 @@ contract IDRPController is AccessControl, Ownable {
         uint256 amount
     );
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address _idrpToken,
         address _safeAddress
-    ) Ownable(_safeAddress) {
+    ) public initializer {
+        __AccessControl_init();
+        __Ownable_init(_safeAddress);
+        __UUPSUpgradeable_init();
+
         idrpToken = _idrpToken;
 
         // Setup roles - set Safe address as the admin
@@ -266,4 +285,7 @@ contract IDRPController is AccessControl, Ownable {
 
         return ecrecover(hash, v, r, s);
     }
+
+    // Override required by UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
