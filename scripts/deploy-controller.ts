@@ -32,8 +32,9 @@ async function main() {
 
   // Deploy contracts
   console.log("Deploying IDRPController...")
-  const IDRPController = await hre.ethers.getContractFactory("IDRPController")
-  const contract = await IDRPController.deploy(deployments["IDRP"], deployer.address)
+  // const IDRPController = await hre.ethers.getContractFactory("IDRPController")
+  // const contract = await IDRPController.deploy(deployments["IDRP"], deployer.address)
+  const contract = await hre.upgrades.deployProxy(await hre.ethers.getContractFactory("IDRPController"), [deployments["IDRP"], deployer.address])
   await contract.waitForDeployment()
   const contractAddress = await contract.getAddress()
   console.log(`IDRPController deployed to: ${contractAddress}`)
