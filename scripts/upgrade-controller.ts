@@ -27,30 +27,16 @@ async function main() {
     deployments = JSON.parse(fs.readFileSync(deploymentFile, "utf-8"));
   }
 
-  // Return if contract is already deployed
-  if (deployments[name]) {
-    console.log(`Contract ${name} already deployed to: ${deployments[name]}`);
-    return;
-  }
-
-  console.log(`Deploying to network: ${networkId}`);
-
-  // Deploy contracts
-  console.log("Deploying IDRPController...");
-  // const IDRPController = await hre.ethers.getContractFactory("IDRPController")
-  // const contract = await IDRPController.deploy(deployments["IDRP"], deployer.address)
-  const contract = await hre.upgrades.deployProxy(
-    await hre.ethers.getContractFactory("IDRPController"),
-    [deployments["IDRP"], deployer.address]
+  // Upgrade IDRPController
+  console.log("Upgrading IDRPController...");
+  const IDRPController = await hre.ethers.getContractFactory("IDRPController");
+  const contract = await hre.upgrades.upgradeProxy(
+    deployments["IDRPController"],
+    IDRPController
   );
   await contract.waitForDeployment();
-  const contractAddress = await contract.getAddress();
-  console.log(`IDRPController deployed to: ${contractAddress}`);
 
-  // Add address to deployments
-  deployments[name] = contractAddress;
-  fs.writeFileSync(deploymentFile, JSON.stringify(deployments, null, 2));
-  console.log(`Deployment data saved to: ${deploymentFile}`);
+  console.log(`IDRPController upgraded with proxy: ${contract.target}`);
 }
 
 main()
