@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -22,11 +21,11 @@ interface IIDRP {
     function unfreeze(address account) external;
 }
 
-contract IDRPController is 
+contract IDRPController is
     Initializable,
     AccessControlUpgradeable,
     OwnableUpgradeable,
-    UUPSUpgradeable 
+    UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
 
@@ -138,6 +137,17 @@ contract IDRPController is
         uint256 deadline,
         bytes[] calldata signatures
     ) external {
+        // Ensure only Admin, Officer, Manager, Director, or Commissioner can call this
+        require(
+            hasRole(ADMIN_ROLE, msg.sender) ||
+                hasRole(OFFICER_ROLE, msg.sender) ||
+                hasRole(MANAGER_ROLE, msg.sender) ||
+                hasRole(DIRECTOR_ROLE, msg.sender) ||
+                hasRole(COMMISSIONER_ROLE, msg.sender),
+            "Caller does not have the required role"
+        );
+
+        // Ensure the operation is not expired
         require(block.timestamp <= deadline, "Operation expired");
 
         // Get the appropriate quorum rule for this operation and amount
@@ -287,5 +297,7 @@ contract IDRPController is
     }
 
     // Override required by UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }
