@@ -1,15 +1,16 @@
 import fs from "fs";
 import path from "path";
-import { ethers } from "hardhat";
+import hre, { ethers } from "hardhat";
 
 async function main() {
   const [deployer] = await ethers.getSigners();
+  const networkId = hre.network.config.chainId ?? 8545;
   console.log("Deployer:", deployer.address);
 
   // Load contract addresses from deployment file
   const deployments = JSON.parse(
     fs.readFileSync(
-      path.join(__dirname, "../deployment/chain-17000.json"),
+      path.join(__dirname, "../deployment/chain-" + networkId + ".json"),
       "utf-8"
     )
   );
