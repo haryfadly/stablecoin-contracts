@@ -7,13 +7,19 @@ async function main() {
   const deployer = signers[0];
   console.log("deployer", deployer.address);
 
-  const [officerAddress, managerAddress, directorAddress, commissionerAddress] =
-    [
-      "0x99A0AD5DF1651D8812B0b4Ca5102ad060C4DC2d3",
-      "0xf712A68ff897cdcdD7a0b68c1DE6886F1F8eD761",
-      "0x5B2A48685a89458ECbaB3AEC56923e128f441995",
-      "0xb9E8412a3b35A5A75b76E679d8791EF2C75984Ed",
-    ];
+  const [
+    officerAddress,
+    managerAddress,
+    directorAddress,
+    commissionerAddress,
+    adminAddress,
+  ] = [
+    "0x99A0AD5DF1651D8812B0b4Ca5102ad060C4DC2d3",
+    "0xf712A68ff897cdcdD7a0b68c1DE6886F1F8eD761",
+    "0x5B2A48685a89458ECbaB3AEC56923e128f441995",
+    "0xb9E8412a3b35A5A75b76E679d8791EF2C75984Ed",
+    "0x0FC4CBd7f60E0BE5FeaCFAB6B8818F88763f9640",
+  ];
 
   const deployments = JSON.parse(
     fs.readFileSync(
@@ -34,6 +40,7 @@ async function main() {
   console.log("IDRPController address:", await controller.getAddress());
 
   // Set up roles for IDRPController
+  const ADMIN_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ADMIN_ROLE"));
   const OFFICER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("OFFICER_ROLE"));
   const MANAGER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MANAGER_ROLE"));
   const DIRECTOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("DIRECTOR_ROLE"));
@@ -41,6 +48,7 @@ async function main() {
     ethers.toUtf8Bytes("COMMISSIONER_ROLE")
   );
 
+  await controller.connect(deployer).grantRole(ADMIN_ROLE, adminAddress);
   await controller.connect(deployer).grantRole(OFFICER_ROLE, officerAddress);
   await controller.connect(deployer).grantRole(MANAGER_ROLE, managerAddress);
   await controller.connect(deployer).grantRole(DIRECTOR_ROLE, directorAddress);
@@ -51,6 +59,9 @@ async function main() {
   console.log("Roles assigned");
 
   // Grant controller the necessary roles on IDRP token
+  await idrp
+    .connect(deployer)
+    .grantRole(await idrp.DEFAULT_ADMIN_ROLE(), adminAddress);
   await idrp
     .connect(deployer)
     .grantRole(await idrp.MINTER_ROLE(), await controller.getAddress());
@@ -177,6 +188,33 @@ async function main() {
       },
       {
         minAmount: TEN_BILLION,
+        maxAmount: ethers.MaxUint256,
+        requiredRoles: [
+          OFFICER_ROLE,
+          MANAGER_ROLE,
+          DIRECTOR_ROLE,
+          COMMISSIONER_ROLE,
+        ],
+      },
+    ]
+  );
+
+  await controller.connect(deployer).setQuorumRules(
+    4, // OperationType.Pause
+    [
+      {
+        minAmount: 0,
+        maxAmount: ethers.MaxUint256,
+        requiredRoles: [DIRECTOR_ROLE, MANAGER_ROLE],
+      },
+    ]
+  );
+
+  await controller.connect(deployer).setQuorumRules(
+    5, // OperationType.Unpause
+    [
+      {
+        minAmount: 0,
         maxAmount: ethers.MaxUint256,
         requiredRoles: [
           OFFICER_ROLE,
