@@ -19,6 +19,10 @@ interface IIDRP {
     function freeze(address account) external;
 
     function unfreeze(address account) external;
+
+    function pause() external;
+
+    function unpause() external;
 }
 
 contract IDRPController is
@@ -44,7 +48,9 @@ contract IDRPController is
         Mint,
         Burn,
         Freeze,
-        Unfreeze
+        Unfreeze,
+        Pause,
+        Unpause
     }
 
     // Quorum rule structure
@@ -162,8 +168,12 @@ contract IDRPController is
             deadline
         );
 
-        // Verify signatures match required roles
-        verifySignatures(operationHash, rule.requiredRoles, signatures);
+        // Verify signatures based on operation type
+        if (operationType == OperationType.Unpause) {
+            verifyUnpauseSignatures(operationHash, signatures);
+        } else {
+            verifySignatures(operationHash, rule.requiredRoles, signatures);
+        }
 
         // Mark operation hash as used to prevent replay
         usedSignatures[operationHash] = true;
@@ -180,9 +190,44 @@ contract IDRPController is
             IIDRP(idrpToken).freeze(to);
         } else if (operationType == OperationType.Unfreeze) {
             IIDRP(idrpToken).unfreeze(to);
+        } else if (operationType == OperationType.Pause) {
+            IIDRP(idrpToken).pause();
+        } else if (operationType == OperationType.Unpause) {
+            IIDRP(idrpToken).unpause();
         }
 
         emit OperationExecuted(operationType, to, amount, nonce - 1);
+    }
+
+    // Specialized function to verify unpause signatures with OR logic
+    function verifyUnpauseSignatures(
+        bytes32 operationHash,
+        bytes[] calldata signatures
+    ) internal view {
+        require(!usedSignatures[operationHash], "Signatures already used");
+        
+        bool hasOfficer = false;
+        bool hasManager = false;
+        bool hasDirector = false;
+        bool hasCommissioner = false;
+        
+        for (uint256 i = 0; i < signatures.length; i++) {
+            address signer = recoverSigner(operationHash, signatures[i]);
+            
+            if (hasRole(OFFICER_ROLE, signer)) hasOfficer = true;
+            if (hasRole(MANAGER_ROLE, signer)) hasManager = true;
+            if (hasRole(DIRECTOR_ROLE, signer)) hasDirector = true;
+            if (hasRole(COMMISSIONER_ROLE, signer)) hasCommissioner = true;
+        }
+        
+        // Check for valid combinations:
+        // 1. officer + manager + director
+        // 2. manager + director + commissioner
+        bool validCombination = 
+            (hasOfficer && hasManager && hasDirector) || 
+            (hasManager && hasDirector && hasCommissioner);
+            
+        require(validCombination, "Invalid signature combination for unpause");
     }
 
     // Function to withdraw other tokens that might be sent to this contract
