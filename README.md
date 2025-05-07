@@ -1,6 +1,6 @@
-# IDRP Stablecoin
+# Stablecoin
 
-IDRP is a stablecoin pegged to the Indonesian Rupiah (IDR). It is an ERC-20 token with additional features such as upgradability, pausing, freezing, and minting/burning capabilities.
+ is a stablecoin pegged to the Indonesian Rupiah (IDR). It is an ERC-20 token with additional features such as upgradability, pausing, freezing, and minting/burning capabilities.
 
 ## Features
 
@@ -13,7 +13,7 @@ IDRP is a stablecoin pegged to the Indonesian Rupiah (IDR). It is an ERC-20 toke
 
 ## Smart Contract Overview
 
-The IDRP contract is built using OpenZeppelin’s upgradeable contracts and consists of:
+The  contract is built using OpenZeppelin’s upgradeable contracts and consists of:
 
 ### Roles
 
